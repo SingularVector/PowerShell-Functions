@@ -3,9 +3,9 @@ name: Standalone toolbox alignment
 on:
   push:
     branches: [master]
-    paths: ['New-StringConversion.ps1', 'Test-IsEmail.ps1', 'Test-IsValidDn.ps1', 'Get-ElapsedTime.ps1', 'Private/**', 'Tests/ToolboxAlignment.Tests.ps1', '.github/workflows/toolbox-alignment.yml']
+    paths: ['New-StringConversion.ps1', 'Test-IsEmail.ps1', 'Test-IsValidDn.ps1', 'Get-ElapsedTime.ps1', 'New-Timer.ps1', 'Stop-Timer.ps1', 'Get-TimerStatus.ps1', 'Private/**', 'Tests/ToolboxAlignment.Tests.ps1', 'Tests/Timer.Tests.ps1', '.github/workflows/toolbox-alignment.yml']
   pull_request:
-    paths: ['New-StringConversion.ps1', 'Test-IsEmail.ps1', 'Test-IsValidDn.ps1', 'Get-ElapsedTime.ps1', 'Private/**', 'Tests/ToolboxAlignment.Tests.ps1', '.github/workflows/toolbox-alignment.yml']
+    paths: ['New-StringConversion.ps1', 'Test-IsEmail.ps1', 'Test-IsValidDn.ps1', 'Get-ElapsedTime.ps1', 'New-Timer.ps1', 'Stop-Timer.ps1', 'Get-TimerStatus.ps1', 'Private/**', 'Tests/ToolboxAlignment.Tests.ps1', 'Tests/Timer.Tests.ps1', '.github/workflows/toolbox-alignment.yml']
   workflow_dispatch:
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
           Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -Repository PSGallery
           Import-Module Pester -RequiredVersion 5.7.1 -Force
           $configuration = New-PesterConfiguration
-          $configuration.Run.Path = @('./Tests/New-ApiRequest.Tests.ps1', './Tests/ToolboxAlignment.Tests.ps1')
+          $configuration.Run.Path = @('./Tests/New-ApiRequest.Tests.ps1', './Tests/ToolboxAlignment.Tests.ps1', './Tests/Timer.Tests.ps1')
           $configuration.Run.Exit = $true
           $configuration.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $configuration
