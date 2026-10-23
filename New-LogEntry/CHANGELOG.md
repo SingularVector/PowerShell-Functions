@@ -1,14 +1,5 @@
 # New-LogEntry - Change History
 
-## Maintenance parity with IT-ToolBox (unreleased)
-
-- Synchronize public logging implementation and private helpers with IT-ToolBox after PR #9.
-- Treat redaction replacements literally, preventing matched secrets from being reinserted.
-- Serialize buffer flushes, retain entries after failures and preserve appended entries.
-- Resolve default paths from the caller, falling back to the interactive working directory.
-- Reject conflicting buffered severity switches.
-- Add regression and concurrent-process tests alongside the dot-source loader tests.
-
 ## Version 2.1.0
 
 - Refactored message formatting, console output, file writes, and buffer handling to remove duplicated logic
