@@ -24,6 +24,10 @@ A PowerShell 7+ logging implementation for production automation with:
 
 See [`New-LogEntry/`](./New-LogEntry/) for documentation, source, tests, and change history.
 
+### New-ApiRequest
+
+The standalone OAuth-style request helper now follows the IT-ToolBox implementation. It requires PowerShell 7.4+, defaults to a form POST, supports dictionary headers and prevents client secrets from entering GET URLs. See [usage and migration notes](./docs/New-ApiRequest.md) and [tests](./Tests/New-ApiRequest.Tests.ps1). No module installation is required.
+
 ## Standalone functions
 
 The repository also contains standalone utilities including:
