@@ -1,49 +1,73 @@
+#Requires -Version 7.4
+
+. (Join-Path $PSScriptRoot 'Private/Test-ITToolBoxDnsName.ps1')
+
 function Test-IsEmail
 {
     <#
     .SYNOPSIS
-        Function to check if a string is an RFC email address.
+        Tests common bare email-address syntax without contacting a mail server.
 
     .DESCRIPTION
-        Function will check if an input string is an RFC complient email address.
+        Accepts an ASCII dot-atom local part and a DNS domain, including an IDN domain
+        and single-label names. The local part is limited to 64 ASCII characters and
+        the complete address to 254 characters after IDN conversion.
+        Rejects display names, comments, quoted local parts, address literals, Unicode
+        local parts, surrounding whitespace and controls. This is a practical subset,
+        not a complete RFC parser or proof of mailbox existence or deliverability.
 
     .PARAMETER EmailAddress
-        A string representing the email address to be checked
+        A bare email address. Null, empty and malformed values return false.
 
     .EXAMPLE
-        PS C:\> Test-IsEmail -EmailAddress 'value1'
+        Test-IsEmail -EmailAddress 'person+tag@example.com'
 
-    .OUTPUTS
-        System.Boolean
-
-    .LINK
-        Restrictions on email addresses
-        https://tools.ietf.org/html/rfc3696#section-3
+    .EXAMPLE
+        'person@example.com', 'invalid' | Test-IsEmail
     #>
 
+    [CmdletBinding()]
     [OutputType([bool])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
+    param (
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
+        [AllowNull()]
+        [AllowEmptyString()]
         [Alias('Email', 'Mail', 'Address')]
-        [string]
-        $EmailAddress
+        [string]$EmailAddress
     )
 
-    try
+    process
     {
-        # Check if address is RFC compliant
-        [void]([mailaddress]$EmailAddress)
+        # Reject blank values and any embedded whitespace or control characters.
+        if ([string]::IsNullOrWhiteSpace($EmailAddress) -or $EmailAddress -match '[\s\p{Cc}]')
+        {
+            return $false
+        }
 
-        Write-Verbose -Message "Address $EmailAddress is an RFC compliant address"
+        [System.Net.Mail.MailAddress]$parsed = $null
 
-        return $true
-    }
-    catch
-    {
-        Write-Verbose -Message "Address $EmailAddress is not an RFC compliant address"
+        # Use the framework parser to reject malformed addresses and non-bare syntaxes.
+        if (-not [System.Net.Mail.MailAddress]::TryCreate($EmailAddress, [ref]$parsed) -or
+            $parsed.Address -cne $EmailAddress -or $parsed.DisplayName.Length -gt 0)
+        {
+            return $false
+        }
 
-        return $false
+        # ASCII dot-atom policy deliberately excludes quoted and internationalized local parts.
+        if ($parsed.User.Length -gt 64 -or
+            $parsed.User -cnotmatch '^[a-zA-Z0-9!#$%&''*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&''*+/=?^_`{|}~-]+)*$')
+        {
+            return $false
+        }
+
+        if (-not (Test-ITToolBoxDnsName -Name $parsed.Host))
+        {
+            return $false
+        }
+
+        # Convert the domain to its ASCII form for the final total-length check.
+        $asciiDomain = [System.Globalization.IdnMapping]::new().GetAscii($parsed.Host)
+
+        return ($parsed.User.Length + 1 + $asciiDomain.Length -le 254)
     }
 }

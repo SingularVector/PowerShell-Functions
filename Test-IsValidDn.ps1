@@ -1,46 +1,35 @@
-function Test-IsValidDN
+#Requires -Version 7.4
+
+. (Join-Path $PSScriptRoot 'Private/Test-ITToolBoxDnSyntax.ps1')
+
+function Test-IsValidDn
 {
     <#
-        .SYNOPSIS
-            Cmdlet will check if the input string is a valid distinguishedname.
+    .SYNOPSIS
+        Tests a practical nonempty distinguished-name string syntax.
 
-        .DESCRIPTION
-            Cmdlet will check if the input string is a valid distinguishedname.
-
-            Cmdlet is intended as a dignostic tool for input validation
-
-        .PARAMETER ObjectDN
-            A string representing the object distinguishedname.
-
-        .EXAMPLE
-            PS C:\> Test-IsValidDN -ObjectDN 'Value1'
+    .DESCRIPTION
+        Supports attribute descriptors/OIDs, escaped separators, hex escapes and
+        multi-valued RDNs. Does not require CN/OU/DC attributes or a DC suffix. Rejects
+        empty attribute values, literal controls, dangling/invalid escapes, unescaped
+        edge spaces and legacy quoted values. Hex-string notation is checked without
+        validating BER contents. No schema, directory existence, canonical equality
+        or decoded UTF-8 validation is performed; this is not a complete RFC parser.
     #>
 
+    [CmdletBinding()]
     [OutputType([bool])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
+    param (
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
+        [AllowNull()]
+        [AllowEmptyString()]
         [Alias('DN', 'DistinguishedName')]
-        [string]
-        $ObjectDN
+        [string]$ObjectDN
     )
 
-    # Create new string builder
-    [System.Text.StringBuilder]$regexStringBuilder = [System.Text.StringBuilder]::New()
-    [void]($regexStringBuilder.Append('^(?:[A-Za-z][\w-]*|\d+(?:\.\d+)*)=(?:#(?:[\dA-Fa-f]{2})+|'))
-    [void]($regexStringBuilder.Append('(?:[^,=\+<>#;\\"]|\\[,=\+<>#;\\"]|\\[\dA-Fa-f]{2})*|"(?:'))
-    [void]($regexStringBuilder.Append('[^\\"]|\\[,=\+<>#;\\"]|\\[\dA-Fa-f]{2})*")(?:\+(?:[A-Za-z]'))
-    [void]($regexStringBuilder.Append('[\w-]*|\d+(?:\.\d+)*)=(?:#(?:[\dA-Fa-f]{2})+|(?:[^,=\+<>#;\\"]'))
-    [void]($regexStringBuilder.Append('|\\[,=\+<>#;\\"]|\\[\dA-Fa-f]{2})*|"(?:[^\\"]|\\[,=\+<>#;\\"]|'))
-    [void]($regexStringBuilder.Append('\\[\dA-Fa-f]{2})*"))*(?:,(?:[A-Za-z][\w-]*|\d+(?:\.\d+)*)=(?:#'))
-    [void]($regexStringBuilder.Append('(?:[\dA-Fa-f]{2})+|(?:[^,=\+<>#;\\"]|\\[,=\+<>#;\\"]|\\[\dA-Fa-f]'))
-    [void]($regexStringBuilder.Append('{2})*|"(?:[^\\"]|\\[,=\+<>#;\\"]|\\[\dA-Fa-f]{2})*")(?:\+(?:[A-Za-z]'))
-    [void]($regexStringBuilder.Append('[\w-]*|\d+(?:\.\d+)*)=(?:#(?:[\dA-Fa-f]{2})+|(?:[^,=\+<>#;\\"]|\\[,=\'))
-    [void]($regexStringBuilder.Append('+<>#;\\"]|\\[\dA-Fa-f]{2})*|"(?:[^\\"]|\\[,=\+<>#;\\"]|\\[\dA-Fa-f]{2})*"))*)*$'))
-
-    # Define DN Regex
-    [string]$distinguishedNameRegex = $regexStringBuilder.ToString()
-
-    return $ObjectDN -match $distinguishedNameRegex
+    process
+    {
+        # Delegate the actual syntax validation to the DN-specific helper so the public wrapper stays simple.
+        return (Test-ITToolBoxDnSyntax -Value $ObjectDN)
+    }
 }

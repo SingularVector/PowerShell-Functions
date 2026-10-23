@@ -1,0 +1,38 @@
+name: Standalone toolbox alignment
+
+on:
+  push:
+    branches: [master]
+    paths: ['New-StringConversion.ps1', 'Test-IsEmail.ps1', 'Test-IsValidDn.ps1', 'Get-ElapsedTime.ps1', 'Private/**', 'Tests/ToolboxAlignment.Tests.ps1', '.github/workflows/toolbox-alignment.yml']
+  pull_request:
+    paths: ['New-StringConversion.ps1', 'Test-IsEmail.ps1', 'Test-IsValidDn.ps1', 'Get-ElapsedTime.ps1', 'Private/**', 'Tests/ToolboxAlignment.Tests.ps1', '.github/workflows/toolbox-alignment.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install and run Pester
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -Repository PSGallery
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          $configuration = New-PesterConfiguration
+          $configuration.Run.Path = @('./Tests/New-ApiRequest.Tests.ps1', './Tests/ToolboxAlignment.Tests.ps1')
+          $configuration.Run.Exit = $true
+          $configuration.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $configuration
