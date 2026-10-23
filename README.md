@@ -32,6 +32,10 @@ The standalone OAuth-style request helper now follows the IT-ToolBox implementat
 
 `New-StringConversion`, `Test-IsEmail`, `Test-IsValidDn` and `Get-ElapsedTime` now use the IT-ToolBox implementations with a PowerShell 7.4 baseline. Dot-source the existing root files as before, keeping `Private/` alongside them. No IT-ToolBox installation is required. See [alignment and migration notes](./docs/ToolboxAlignment.md) and [tests](./Tests/ToolboxAlignment.Tests.ps1).
 
+### UPN generation and directory lookup
+
+`Get-UniqueUPN` and `Test-UPNExist` now use explicit forest/domain lookup scope, escaped LDAP equality filters, bounded collision checks and independent name formatting. They require PowerShell 7.4; actual lookups additionally require the ActiveDirectory module and directory connectivity. See [usage and compatibility notes](./docs/UPN.md). These are availability checks, not atomic reservations.
+
 ## Standalone functions
 
 The repository also contains standalone utilities including:
