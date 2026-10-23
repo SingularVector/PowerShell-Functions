@@ -1,0 +1,41 @@
+From: sender@example.com
+To: receiver@example.com
+Subject: Multipart sample
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Plain body
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>HTML body</p><img src="https://example.invalid/never-fetch">
+--alt--
+--outer
+Content-Type: application/octet-stream; name="../danger.txt"
+Content-Disposition: attachment; filename="../danger.txt"
+Content-Transfer-Encoding: base64
+
+c2FtcGxl
+--outer
+Content-Type: image/png
+Content-Disposition: inline; filename="image.png"
+Content-Id: <image-one>
+Content-Transfer-Encoding: base64
+
+aW1hZ2U=
+--outer
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="forwarded.eml"
+
+From: nested@example.com
+To: receiver@example.com
+Subject: Nested message
+
+Nested body
+--outer--

@@ -1,0 +1,40 @@
+name: EML parser
+
+on:
+  push:
+    branches: [master]
+    paths: ['Convert-EmlFile.ps1', 'Private/Import-EmlMimeKit.ps1', 'scripts/Install-EmlDependency.ps1', 'Tests/Convert-EmlFile.Tests.ps1', 'Tests/Fixtures/Eml/**', '.github/workflows/eml.yml']
+  pull_request:
+    paths: ['Convert-EmlFile.ps1', 'Private/Import-EmlMimeKit.ps1', 'scripts/Install-EmlDependency.ps1', 'Tests/Convert-EmlFile.Tests.ps1', 'Tests/Fixtures/Eml/**', '.github/workflows/eml.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install EML parser dependency
+        run: ./scripts/Install-EmlDependency.ps1
+      - name: Install and run Pester
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -Repository PSGallery
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          $configuration = New-PesterConfiguration
+          $configuration.Run.Path = './Tests'
+          $configuration.Run.Exit = $true
+          $configuration.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $configuration
