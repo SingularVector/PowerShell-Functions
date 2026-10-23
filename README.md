@@ -28,6 +28,10 @@ See [`New-LogEntry/`](./New-LogEntry/) for documentation, source, tests, and cha
 
 The standalone OAuth-style request helper now follows the IT-ToolBox implementation. It requires PowerShell 7.4+, defaults to a form POST, supports dictionary headers and prevents client secrets from entering GET URLs. See [usage and migration notes](./docs/New-ApiRequest.md) and [tests](./Tests/New-ApiRequest.Tests.ps1). No module installation is required.
 
+### String conversion, email/DN validation and elapsed time
+
+`New-StringConversion`, `Test-IsEmail`, `Test-IsValidDn` and `Get-ElapsedTime` now use the IT-ToolBox implementations with a PowerShell 7.4 baseline. Dot-source the existing root files as before, keeping `Private/` alongside them. No IT-ToolBox installation is required. See [alignment and migration notes](./docs/ToolboxAlignment.md) and [tests](./Tests/ToolboxAlignment.Tests.ps1).
+
 ## Standalone functions
 
 The repository also contains standalone utilities including:
