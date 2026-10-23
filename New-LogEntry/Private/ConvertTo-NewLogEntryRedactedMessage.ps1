@@ -18,8 +18,7 @@ function ConvertTo-NewLogEntryRedactedMessage
             continue
         }
 
-        # Escape dollar signs so replacement syntax cannot reinsert matched secrets.
-        $redactedMessage = [regex]::Replace($redactedMessage, $item, $Replacement.Replace('$', '$$'))
+        $redactedMessage = [regex]::Replace($redactedMessage, $item, $Replacement)
     }
 
     return $redactedMessage
