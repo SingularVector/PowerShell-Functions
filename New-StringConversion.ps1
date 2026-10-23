@@ -41,7 +41,7 @@
     #>
     [CmdletBinding(DefaultParameterSetName = 'ReplaceSpaces',
                    ConfirmImpact = 'High',
-                   HelpUri = 'https://PsCustomObject.github.io')]
+                   HelpUri = 'https://singularvector.github.io')]
     param
     (
         [Parameter(ParameterSetName = 'IgnoreSpaces',
