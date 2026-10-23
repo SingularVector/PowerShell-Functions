@@ -1,0 +1,38 @@
+name: New-ApiRequest
+
+on:
+  push:
+    branches: [master]
+    paths: ['New-ApiRequest.ps1', 'Tests/New-ApiRequest.Tests.ps1', '.github/workflows/new-api-request.yml']
+  pull_request:
+    paths: ['New-ApiRequest.ps1', 'Tests/New-ApiRequest.Tests.ps1', '.github/workflows/new-api-request.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install and run Pester
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -Repository PSGallery
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          $configuration = New-PesterConfiguration
+          $configuration.Run.Path = './Tests/New-ApiRequest.Tests.ps1'
+          $configuration.Run.Exit = $true
+          $configuration.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $configuration

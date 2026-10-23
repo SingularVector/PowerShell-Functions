@@ -1,121 +1,123 @@
+#Requires -Version 7.4
+
 function New-ApiRequest
 {
-<#
+    <#
     .SYNOPSIS
-        Function will query data from an URL API.
+        Sends an OAuth-style client request and returns the endpoint response.
 
     .DESCRIPTION
-        Function is intended as a wrapper around PowerShell built-in Invoke-RestMethod cmdlet allowing user to quickly generate web requests to APIs requiring OAuth2 authentication.
-
-    .PARAMETER ApiKey
-        A string representing the API key to be used.
-
-    .PARAMETER ApiSecret
-        A string representing the API key secret.
-
-    .PARAMETER ApiUrl
-        A string representing the API endpoint URL
-
-    .PARAMETER GrantType
-        A string representing the Grant Type supported by the API.
-
-        If not specified it will default to client_credentials.
-
-    .PARAMETER ContentType
-        A string representing the content type to send as part of the request in case request needs to be crafted with a special ContentType.
-
-    .PARAMETER Method
-        A string representing the method to be used in the web request.
-
-        If not specified it will default to GET.
+        Builds client_id and grant_type fields, plus optional client_secret. Defaults
+        to POST with application/x-www-form-urlencoded. JSON is also supported. This
+        helper does not acquire a token and then call another API, or manage token refresh.
+        GET is allowed only without ApiSecret; Invoke-RestMethod turns its dictionary
+        body into query parameters. Requests containing ApiSecret require HTTPS.
+        Automatic redirects are disabled. HTTP failures terminate; no retry is performed.
 
     .PARAMETER Headers
-        A string representing custom headers to send as part of the webrequest.
+        Dictionary of HTTP headers. Specify Content-Type through ContentType instead.
 
     .EXAMPLE
-        PS C:\> New-ApiRequest -ApiKey 'Value1' -ApiUrl 'Value2' -ApiSecret 'MySecret'
-
-    .NOTES
-        Additional information about the function.
-#>
+        New-ApiRequest -ApiKey 'client-id' -ApiSecret $secret -ApiUrl 'https://example.invalid/oauth/token'
+    #>
 
     [CmdletBinding()]
-    [OutputType([pscustomobject])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [string]
-        $ApiKey,
-        [string]
-        $ApiSecret,
-        [Parameter(Mandatory = $true)]
+    [OutputType([object])]
+    param (
+        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string]
-        $ApiUrl,
+        [string]$ApiKey,
+
         [ValidateNotNullOrEmpty()]
-        [string]
-        $GrantType = 'client_credentials',
+        [string]$ApiSecret,
+
+        [Parameter(Mandatory)]
+        [ValidateScript({ $_.IsAbsoluteUri -and $_.Scheme -in @('http', 'https') -and [string]::IsNullOrEmpty($_.UserInfo) })]
+        [uri]$ApiUrl,
+
         [ValidateNotNullOrEmpty()]
-        [string]
-        $ContentType,
-        [ValidateNotNullOrEmpty()]
-        [ValidateSet('GET', 'POST', IgnoreCase = $true)]
-        [string]
-        $Method = 'GET',
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $Headers
+        [string]$GrantType = 'client_credentials',
+
+        [ValidateSet('application/x-www-form-urlencoded', 'application/json')]
+        [string]$ContentType = 'application/x-www-form-urlencoded',
+
+        [ValidateSet('GET', 'POST')]
+        [string]$Method = 'POST',
+
+        [ValidateNotNull()]
+        [System.Collections.IDictionary]$Headers,
+
+        [Alias('TimeoutSec')]
+        [ValidateRange(1, 300)]
+        [int]$ConnectionTimeoutSeconds = 30
     )
 
-    Process
+    $methodName = $Method.ToUpperInvariant()
+    $hasSecret = $PSBoundParameters.ContainsKey('ApiSecret')
+
+    if ($hasSecret -and $methodName -eq 'GET')
     {
-        # Generate request post data
-        [hashtable]$requestBody = @{
-            'client_id'  = $ApiKey;
-            'grant_type' = $GrantType
-        }
-
-        switch ($PSBoundParameters.Keys)
-        {
-            'ContentType'
-            {
-                $requestBody.Add('ContentType', $ContentType)
-
-                break
-            }
-            'ApiSecret'
-            {
-                $requestBody.Add('client_secret', $ApiSecret)
-
-                break
-            }
-        }
-
-        # Define splat command
-        $paramInvokeWebRequest = @{
-            Uri  = $ApiUrl
-            Body = $requestBody
-        }
-
-        # Get passed parameters
-        switch ($PSBoundParameters.Keys)
-        {
-            'Headers'
-            {
-                # Add custom header
-                $paramInvokeWebRequest.Add('Headers', $Headers)
-
-                break
-            }
-            'Method'
-            {
-                # Use custom method
-                $paramInvokeWebRequest.Add('Method', $Method)
-
-                break
-            }
-        }
-
-        return Invoke-RestMethod @paramInvokeWebRequest
+        throw [ArgumentException]::new('ApiSecret cannot be sent with GET because it would enter the URL query string. Use POST.')
     }
+
+    if ($hasSecret -and $ApiUrl.Scheme -ne 'https')
+    {
+        throw [ArgumentException]::new('Requests containing ApiSecret require HTTPS.')
+    }
+
+    if ($PSBoundParameters.ContainsKey('Headers'))
+    {
+        foreach ($name in $Headers.Keys)
+        {
+            if ([string]$name -ieq 'Content-Type')
+            {
+                throw [ArgumentException]::new('Specify Content-Type with the ContentType parameter, not Headers.')
+            }
+
+            if ([string]$name -ieq 'Authorization' -and $ApiUrl.Scheme -ne 'https')
+            {
+                throw [ArgumentException]::new('Requests containing Authorization headers require HTTPS.')
+            }
+        }
+    }
+
+    [hashtable]$requestBody = @{
+        client_id  = $ApiKey
+        grant_type = $GrantType
+    }
+
+    if ($hasSecret)
+    {
+        $requestBody.client_secret = $ApiSecret
+    }
+
+    [hashtable]$request = @{
+        Uri                      = $ApiUrl
+        Method                   = $methodName
+        Body                     = $requestBody
+        MaximumRedirection       = 0
+        ConnectionTimeoutSeconds = $ConnectionTimeoutSeconds
+        ErrorAction              = 'Stop'
+    }
+
+    if ($methodName -eq 'POST')
+    {
+        $request.ContentType = $ContentType
+
+        if ($ContentType -ieq 'application/json')
+        {
+            $request.Body = ConvertTo-Json -InputObject $requestBody -Compress
+        }
+    }
+    elseif ($PSBoundParameters.ContainsKey('ContentType'))
+    {
+        throw [ArgumentException]::new('ContentType applies to POST requests. GET sends query parameters.')
+    }
+
+    if ($PSBoundParameters.ContainsKey('Headers'))
+    {
+        $request.Headers = $Headers
+    }
+
+    return Invoke-RestMethod @request
 }
