@@ -1,169 +1,143 @@
+#Requires -Version 7.4
+
+. (Join-Path $PSScriptRoot 'Test-UpnExist.ps1')
+. (Join-Path $PSScriptRoot 'Private/Test-ITToolBoxDnsName.ps1')
+
 function Get-UniqueUPN
 {
-<#
+    <#
     .SYNOPSIS
-        Cmdlet will generate a forest wide unique UPN.
-
+        Finds an available user principal name in the selected directory scope.
     .DESCRIPTION
-        Cmdlet will generate a forest wide unique UPN according to generation rules
-        defined by the user.
-
-        Cmdlet accept different types of objects to generate the UPN to allow greater flexibility
-
-        ADObject - For example and object from Get-AdUser cmdlet
-        Strings - Representing First Name, Last Name etc.
-        DirectoryService Objects - For example when using native .Net methods to retrieve the identity
-
-    .PARAMETER ADObject
-        An ADObject for example output of the Get-ADUser cmdlet
-
-    .PARAMETER FirstName
-        A string representing the First Name of the user
-
-    .PARAMETER LastName
-        A string representing the Last Name of the user
-
-    .PARAMETER MiddleName
-        A string representing the Middle Name of the user, parameter is optional.
-
-    .PARAMETER UPNSuffix
-        A string representing the UPN suffix to be used.
-
-    .PARAMETER FirstNameFormat
-        A string representing the format to be for the First Name part of the UPN.
-
-    .PARAMETER LastNameFormat
-        A string representing the format to be for the Last Name part of the UPN.
-
-    .PARAMETER IncludeMiddleName
-        When paramenter is specified user Middle Name, if present, will be included in the UPN generation process.
-
-    .PARAMETER ADServer
-        A string representing the name of the AD Domain Controller that will be used to query Active Directory.
-
-        If no server is specified the closest Global Catalog will be automatically selected.
-
-    .PARAMETER Separator
-        A string representing the separator to be used between UPN parts, defaults to a '.'.
-#>
-
+        Accepts explicit name strings or ADUser, DirectoryEntry and SearchResult
+        inputs. First and last name formatting are independent. Collisions append
+        an integer to the complete local part; the search has a bounded attempt count.
+        Availability is a preflight check, not a reservation or atomic uniqueness guarantee.
+    .PARAMETER MaxAttempts
+        Maximum candidates to check, including the initial unsuffixed name. Defaults to 1000.
+    .PARAMETER AdServer
+        Directory hostname, optionally with port. See Test-UPNExist for scope behaviour.
+    #>
     [CmdletBinding(DefaultParameterSetName = 'Strings')]
-    param
-    (
-        [Parameter(ParameterSetName = 'ADObject',
-                   Mandatory = $true)]
+    [OutputType([string])]
+    param (
+        [Parameter(ParameterSetName = 'ADObject', Mandatory)]
+        [ValidateNotNull()]
         [object]$ADObject,
-        [Parameter(ParameterSetName = 'Strings',
-                   Mandatory = $true)]
+
+        [Parameter(ParameterSetName = 'Strings', Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$FirstName,
-        [Parameter(ParameterSetName = 'Strings',
-                   Mandatory = $true)]
+
+        [Parameter(ParameterSetName = 'Strings', Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$LastName,
+
         [Parameter(ParameterSetName = 'Strings')]
-        [ValidateNotNullOrEmpty()]
         [string]$MiddleName,
-        [Parameter(Mandatory = $true)]
+
+        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$UPNSuffix,
-        [ValidateSet('FullName', 'FirstLetter', IgnoreCase = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$FirstNameFormat = 'Full',
-        [ValidateSet('FullName', 'FirstLetter', IgnoreCase = $true)]
-        [ValidateNotNullOrEmpty()]
+
+        [ValidateSet('FullName', 'FirstLetter')]
+        [string]$FirstNameFormat = 'FullName',
+
+        [ValidateSet('FullName', 'FirstLetter')]
         [string]$LastNameFormat = 'FullName',
+
         [switch]$IncludeMiddleName,
-        [ValidateNotNullOrEmpty()]
+
+        [Alias('Server')]
+        [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*(?::[0-9]{1,5})?$')]
         [string]$ADServer,
-        [ValidateNotNullOrEmpty()]
-        [string]$Separator = '.'
+
+        [ValidatePattern('^[^\s@\p{Cc}]*$')]
+        [AllowEmptyString()]
+        [string]$Separator = '.',
+
+        [ValidateSet('Forest', 'Domain')]
+        [string]$SearchScope = 'Forest',
+
+        [ValidateRange(1, 100000)]
+        [int]$MaxAttempts = 1000
     )
+
+    $givenName = $FirstName
+    $surname = $LastName
+    $middleNameValue = $MiddleName
 
     if ($PSCmdlet.ParameterSetName -eq 'ADObject')
     {
-        switch ($ADObject.GetType().FullName)
+        if ($ADObject.PSObject.TypeNames -contains 'Microsoft.ActiveDirectory.Management.ADUser')
         {
-            'Microsoft.ActiveDirectory.Management.ADUser'
-            {
-                [string]$firstName = $ADObject.GivenName
-                [string]$lastName = $ADObject.Surname
-                [string]$middleName = $ADObject.MiddleName
-
-                break
-            }
-            'System.DirectoryServices.DirectoryEntry'
-            {
-                [string]$firstName = $ADObject.Properties['givenName'][0]
-                [string]$lastName = $ADObject.Properties['sn'][0]
-                [string]$middleName = $ADObject.Properties['middleName'][0]
-
-                break
-            }
-            'System.DirectoryServices.SearchResult'
-            {
-                [string]$firstName = $ADObject.Properties['givenName'][0]
-                [string]$lastName = $ADObject.Properties['sn'][0]
-                [string]$middleName = $ADObject.Properties['middleName'][0]
-
-                break
-            }
-            default
-            {
-                throw "Unsupported AD object type: $($ADObject.GetType().FullName)"
-            }
+            $givenName = [string]$ADObject.GivenName
+            $surname = [string]$ADObject.Surname
+            $middleNameValue = [string]$ADObject.MiddleName
         }
-    }
-    else
-    {
-        [string]$firstName = $FirstName
-        [string]$lastName = $LastName
-        [string]$middleName = $MiddleName
-    }
-
-    # Format first name
-    $firstName = switch ($FirstNameFormat)
-    {
-        'FullName'
+        elseif ($ADObject.PSObject.TypeNames -contains 'System.DirectoryServices.DirectoryEntry' -or
+                $ADObject.PSObject.TypeNames -contains 'System.DirectoryServices.SearchResult')
         {
-            $firstName
+            $givenName = [string](@($ADObject.Properties['givenName'])[0])
+            $surname = [string](@($ADObject.Properties['sn'])[0])
+            $middleNameValue = [string](@($ADObject.Properties['middleName'])[0])
         }
-        'FirstLetter'
+        else
         {
-            $firstName.Substring(0, 1)
+            throw "Unsupported AD object type: $($ADObject.GetType().FullName)"
         }
     }
 
-    # Format last name
-    $LastName = switch ($FirstNameFormat)
+    foreach ($name in @($givenName, $surname))
     {
-        'FullName'
+        if ([string]::IsNullOrWhiteSpace($name) -or $name.Trim() -match '[\s@\p{Cc}]')
         {
-            $LastName
-        }
-        'FirstLetter'
-        {
-            $LastName.Substring(0, 1)
+            throw 'First and last names must contain nonblank components without embedded whitespace, controls or @. Normalize compound names before calling.'
         }
     }
-
-    # Use middle name
-    [string]$middleNamePart = if ($IncludeMiddleName -and $MiddleName)
+    if (-not (Test-ITToolBoxDnsName -Name $UPNSuffix))
     {
-        '{0}{1}' -f $Separator, $MiddleName
+        throw 'UPNSuffix must be a DNS/IDN name without whitespace or a trailing root dot.'
     }
 
-    # Setup required attributes
-    [string]$baseUPN = ('{0}{1}{2}{3}@{4}' -f $FirstName, $middleNamePart, $Separator, $LastName, $UPNSuffix).ToLower()
-    [string]$uniqueUPN = $baseUPN
-    [int]$counter = 1
-
-    while (Test-UPNExist -UPN $uniqueUPN -Server $ADServer)
+    $first = $givenName.Trim()
+    $last = $surname.Trim()
+    if ($FirstNameFormat -eq 'FirstLetter')
     {
-        $uniqueUPN = '{0}{1}@{2}' -f ($baseUPN.Split('@')[0]), $counter, $UPNSuffix
-
-        $counter++
+        $first = [System.Globalization.StringInfo]::GetNextTextElement($first)
+    }
+    if ($LastNameFormat -eq 'FirstLetter')
+    {
+        $last = [System.Globalization.StringInfo]::GetNextTextElement($last)
+    }
+    $parts = [System.Collections.Generic.List[string]]::new()
+    $parts.Add($first)
+    if ($IncludeMiddleName -and -not [string]::IsNullOrWhiteSpace($middleNameValue))
+    {
+        $middle = $middleNameValue.Trim()
+        if ($middle -match '[\s@\p{Cc}]')
+        {
+            throw 'Middle name must not contain embedded whitespace, controls or @.'
+        }
+        $parts.Add($middle)
+    }
+    $parts.Add($last)
+    $localPart = ($parts -join $Separator).ToLowerInvariant()
+    $suffix = $UPNSuffix.ToLowerInvariant()
+    $lookup = @{ SearchScope = $SearchScope; ErrorAction = 'Stop' }
+    if ($PSBoundParameters.ContainsKey('ADServer'))
+    {
+        $lookup.AdServer = $ADServer
     }
 
-    return $uniqueUPN
+    for ($attempt = 0; $attempt -lt $MaxAttempts; $attempt++)
+    {
+        $counter = if ($attempt -eq 0) { '' } else { [string]$attempt }
+        $candidate = '{0}{1}@{2}' -f $localPart, $counter, $suffix
+        if (-not (Test-UPNExist -UPN $candidate @lookup))
+        {
+            return $candidate
+        }
+    }
+    throw "No available UPN found after $MaxAttempts candidates."
 }
