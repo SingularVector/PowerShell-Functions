@@ -1,73 +1,36 @@
 function Stop-Timer
 {
     <#
-        .SYNOPSIS
-            Function will halt a stopwatch.
-
-        .DESCRIPTION
-            Function requires a [System.Diagnostics.Stopwatch] object as input and will invoke the stop() method to hald its execution.
-
-            If no exceptions are returned function will return $True.
-
-        .PARAMETER Timer
-            A [System.Diagnostics.Stopwatch] representing the stopwatch to stop.
-
-        .EXAMPLE
-            PS C:\> Stop-Timer -Timer $Timer
-
-        .OUTPUTS
-            System.Boolean
+    .SYNOPSIS
+        Stops a stopwatch without resetting its elapsed time.
+    .DESCRIPTION
+        Returns $true after stopping the supplied stopwatch. Stopping an already
+        stopped stopwatch also succeeds. Invalid input is rejected during binding.
+        If Stop() throws, reports a warning and returns $false.
+    .PARAMETER Timer
+        The stopwatch instance to stop.
+    .EXAMPLE
+        Stop-Timer -Timer $Timer
+    .OUTPUTS
+        System.Boolean
     #>
-
+    [CmdletBinding()]
     [OutputType([bool])]
-    param
-    (
+    param (
         [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
         [System.Diagnostics.Stopwatch]$Timer
     )
 
-    Begin
+    try
     {
-        # Save current configuration
-        [string]$currentConfig = $ErrorActionPreference
-
-        # Update configuration
-        $ErrorActionPreference = 'Stop'
+        $Timer.Stop()
+        return $true
     }
-
-    Process
+    catch
     {
-        try
-        {
-            # Stop timer
-            $Timer.Stop()
-
-            return $true
-        }
-        catch
-        {
-            # Save exception
-            [string]$reportedException = $Error[0].Exception.Message
-
-            Write-Warning -Message 'Exception reported while halting stopwatch - Use the -Verbose parameter for more details'
-
-            # Check we have an exception message
-            if ([string]::IsNullOrEmpty($reportedException) -eq $false)
-            {
-                Write-Verbose -Message $reportedException
-            }
-            else
-            {
-                Write-Verbose -Message 'No inner exception reported by Disconnect-AzureAD cmdlet'
-            }
-
-            return $false
-        }
-    }
-
-    End
-    {
-        # Revert back configuration
-        $ErrorActionPreference = $currentConfig
+        Write-Warning -Message 'Exception reported while stopping stopwatch; use -Verbose for details.'
+        Write-Verbose -Message $_.Exception.Message
+        return $false
     }
 }

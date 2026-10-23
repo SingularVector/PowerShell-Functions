@@ -17,10 +17,12 @@ function Get-TimerStatus
             System.Boolean
     #>
 
+    [CmdletBinding()]
     [OutputType([bool])]
     param
     (
         [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
         [System.Diagnostics.Stopwatch]
         $Timer
     )
