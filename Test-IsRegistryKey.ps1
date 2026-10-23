@@ -1,34 +1,22 @@
+#Requires -Version 7.4
+
+. (Join-Path $PSScriptRoot 'Private/Open-StandaloneRegistryKey.ps1')
+
 function Test-IsRegistryKey
 {
     <#
-        .SYNOPSIS
-            Cmdlet will check if the specified registry key is valid.
-
-        .DESCRIPTION
-            Cmdlet will check if the specified registry path is valid.
-
-        .PARAMETER KeyPath
-            A string representing the registry path to check in the PSDrive format IE HKLM:\SOFTWARE
-
-        .EXAMPLE
-            PS C:\> Test-IsRegistryKey -KeyPath 'value1'
+    .SYNOPSIS
+        Tests whether a literal Windows Registry key exists.
+    .DESCRIPTION
+        Missing keys return false. Provider, permission and operational errors
+        terminate. Non-Windows systems are unsupported. This tests keys, not values.
     #>
-
+    [CmdletBinding()]
     [OutputType([bool])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $KeyPath
-    )
+    param ([Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$KeyPath)
 
-    if (Test-Path -Path $KeyPath)
-    {
-        return (Get-Item -Path $KeyPath).PsProvider.Name -match 'Registry'
-    }
-    else
-    {
-        return $false
-    }
+    $key = Open-StandaloneRegistryKey -Path $KeyPath
+    if ($null -eq $key) { return $false }
+    try { return $true }
+    finally { $key.Dispose() }
 }

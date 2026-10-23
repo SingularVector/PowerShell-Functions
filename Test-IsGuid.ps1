@@ -1,44 +1,39 @@
+#Requires -Version 7.4
+
 function Test-IsGuid
 {
     <#
-        .SYNOPSIS
-            Cmdlet will check if input string is a valid GUID.
-
-        .DESCRIPTION
-            Cmdlet will check if input string is a valid GUID.
-
-        .PARAMETER ObjectGuid
-            A string representing the GUID to be tested.
-
-        .EXAMPLE
-            PS C:\> Test-IsGuid -ObjectGuid 'value1'
-
-            # Output
-            $False
-
-        .EXAMPLE
-            PS C:\> Test-IsGuid -ObjectGuid '7761bf39-9a9f-42c8-869f-7c6e2689811a'
-
-            # Output
-            $True
-
-        .OUTPUTS
-            System.Boolean
-
-        .NOTES
-            Additional information about the function.
+    .SYNOPSIS
+        Tests a complete GUID string using defined .NET formats.
+    .DESCRIPTION
+        Accepts N (32 digits), D (dashed), B (matched braces) and P (matched
+        parentheses). Rejects surrounding whitespace, extra lines, mixed optional
+        delimiters and the X initializer format. Null and empty input return false.
+        The all-zero GUID is syntactically valid; this does not test object existence.
     #>
+    [CmdletBinding()]
     [OutputType([bool])]
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [string]
-        $ObjectGuid
+    param (
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$ObjectGuid
     )
 
-    # Define verification regex
-    [regex]$guidRegex = '(?im)^[{(]?[0-9A-F]{8}[-]?(?:[0-9A-F]{4}[-]?){3}[0-9A-F]{12}[)}]?$'
-
-    # Check guid against regex
-    return $ObjectGuid -match $guidRegex
+    process
+    {
+        if ([string]::IsNullOrWhiteSpace($ObjectGuid) -or $ObjectGuid -match '\s')
+        {
+            return $false
+        }
+        $parsed = [guid]::Empty
+        foreach ($format in @('N', 'D', 'B', 'P'))
+        {
+            if ([guid]::TryParseExact($ObjectGuid, $format, [ref]$parsed))
+            {
+                return $true
+            }
+        }
+        return $false
+    }
 }
