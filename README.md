@@ -36,6 +36,10 @@ The standalone OAuth-style request helper now follows the IT-ToolBox implementat
 
 `Get-UniqueUPN` and `Test-UPNExist` now use explicit forest/domain lookup scope, escaped LDAP equality filters, bounded collision checks and independent name formatting. They require PowerShell 7.4; actual lookups additionally require the ActiveDirectory module and directory connectivity. See [usage and compatibility notes](./docs/UPN.md). These are availability checks, not atomic reservations.
 
+### Convert-EmlFile
+
+Cross-platform MIME parsing now replaces the Windows-only COM result with detached message objects. Requires PowerShell 7.4 and explicit installation of pinned MimeKitLite: `./scripts/Install-EmlDependency.ps1`. Parsing itself never downloads dependencies. See [output schema and migration notes](./docs/Convert-EmlFile.md), especially changes from CDO.Message.
+
 ## Standalone functions
 
 The repository also contains standalone utilities including:
@@ -46,7 +50,7 @@ The repository also contains standalone utilities including:
 - [`Get-TimerStatus`](./Get-TimerStatus.ps1) — returns the running state of a stopwatch
 - [`New-ApiRequest`](./New-ApiRequest.ps1) — helper for API calls using OAuth2 authentication
 - [`Test-IsGuid`](./Test-IsGuid.ps1) — validates GUID strings
-- [`Convert-EmlFile`](./Convert-EmlFile.ps1) — converts `.eml` files into PowerShell objects
+- [`Convert-EmlFile`](./Convert-EmlFile.ps1) — parses local MIME messages into detached PowerShell objects
 - [`New-StringConversion`](./New-StringConversion.ps1) — handles selected string/character conversion scenarios
 - [`Test-IsRegistryKey`](./Test-IsRegistryKey.ps1) — validates registry keys for use by `Export-Registry`
 - [`Export-Registry`](./Export-Registry.ps1) — exports registry data to CSV or XML

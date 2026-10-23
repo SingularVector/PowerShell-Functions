@@ -1,0 +1,14 @@
+From: =?utf-8?Q?J=C3=B6rg?= <sender@example.com>
+To: Team: Alice <alice@example.com>, Bob <bob@example.com>;
+Cc: copy@example.com
+Reply-To: replies@example.com
+Subject: =?utf-8?Q?caf=C3=A9?=
+Date: Sat, 24 Oct 2026 10:30:00 +0200
+Message-Id: <plain@example.com>
+X-Trace: first
+X-Trace: second
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+Y2Fmw6kK

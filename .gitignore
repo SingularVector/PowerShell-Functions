@@ -1,1 +1,4 @@
 ﻿*.TempPoint.ps1
+
+# Locally installed EML parser dependency
+.eml-dependencies/

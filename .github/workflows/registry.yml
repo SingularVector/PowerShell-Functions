@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Install EML parser dependency
+        run: ./scripts/Install-EmlDependency.ps1
       - name: Install and run Pester
         run: |
           $ErrorActionPreference = 'Stop'

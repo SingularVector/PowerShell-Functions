@@ -1,0 +1,2 @@
+# Preserve MIME fixtures byte-for-byte, including CRLF header separators.
+Tests/Fixtures/Eml/*.eml binary
