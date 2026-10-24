@@ -239,3 +239,18 @@ Released under the [MIT License](./LICENSE).
 The New-LogEntry workflow runs the Pester suite on Windows, Linux, and macOS using each GitHub-hosted runner's installed PowerShell. It also checks PowerShell syntax and performs a separate loader smoke test. Pester is pinned to version 5.7.1.
 
 PowerShell 7.1 is the API minimum because the mutex helper uses .NET 5 APIs. CI tests the runner versions, not every historical PowerShell release.
+
+### Logger path and lock boundaries
+
+Explicit log destinations must use the FileSystem provider. Non-filesystem paths
+such as `Env:NAME` are rejected before file operations. Interactive calls from a
+non-filesystem location require an explicit filesystem log destination; a calling
+script can still supply the default directory through its own filesystem path.
+A rejected flush preserves the buffer.
+
+On Windows and macOS, case-only path aliases share a mutex. On case-sensitive Mac
+volumes, distinct case-only filenames may therefore serialize unnecessarily.
+Locks remain path-based: symlink/hard-link aliases are not resolved to file identity.
+Upgrade all writers together: older macOS implementations can use different lock
+names for lowercase paths. Keep one consistent path spelling during mixed-version
+operation.
