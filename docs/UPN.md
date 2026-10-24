@@ -2,7 +2,7 @@
 
 ## Requirements and loading
 
-PowerShell 7.4 or later. Dot-source the existing root Get-UniqueUPN.ps1 file: it loads Test-UpnExist.ps1 and the required Private/ helpers. Test-UpnExist.ps1 can also be loaded alone. IT-ToolBox is not required or changed. Keep these files together when copying them.
+PowerShell 7.4 or later. Dot-source the existing root Get-UniqueUPN.ps1 file: it loads Test-UpnExist.ps1, Test-IsValidUpn.ps1 and the required Private/ helpers. Test-UpnExist.ps1 can also be loaded alone. IT-ToolBox is not required; equivalent commands are also provided by IT-ToolBox 3.3.0. Keep these files together when copying them.
 
 Actual lookup uses Get-ADUser from the ActiveDirectory module (for example, an appropriately configured Windows management host with RSAT). Forest discovery also needs Get-ADDomainController; Domain scope needs Get-ADRootDSE. Dependencies are checked at invocation, so scripts load and offline tests run without the AD module. This replaces the historical System.DirectoryServices query and is a deliberate new dependency. Live operation from macOS/Linux is not asserted by the offline tests.
 
@@ -45,3 +45,35 @@ https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-aduser
 An unused UPN is a point-in-time observation, not a reservation. Replication delays, concurrent provisioning and scoped directory permissions affect what can be observed. Handle collision errors in account creation and retry according to your provisioning workflow. Domain scope only checks that domain; alternate credentials and custom search roots are not added by this patch.
 
 Tests mock AD commands and validate request assembly, naming, errors and output contracts. Before production, check with a test forest: known-present/absent users, collisions, two domains, explicit GC and domain controllers, discovery, port 3269 if used, permissions and connectivity failures. Perform provisioning validation only with approved test accounts; the functions themselves do not create or modify users.
+
+## Consistent naming policy
+
+Every generated candidate must satisfy Test-IsValidUpn, using the same implementation
+as IT-ToolBox: ASCII letters/digits at the username edges; dots, underscores,
+hyphens and apostrophes internally; no consecutive dots; and a DNS/IDN suffix.
+The initial candidate is validated before any directory call. Numeric collision
+suffixes preserve that syntax policy.
+
+This deliberately changes older generation behavior. For example, José/García
+and separators such as / or .. now cause a policy error. Normalize names according
+to your organization's rules before calling, for example explicitly supplying
+Jose and Garcia. No silent accent stripping or custom-map conversion is performed.
+Unicode AD identities are not intrinsically invalid; this is the toolkit's
+chosen generation policy. Test-UPNExist still searches literal existing identities,
+including Unicode names, without imposing the generation policy on the lookup.
+
+An absent optional ADUser MiddleName property is treated as empty, including under
+StrictMode. Explicit server ports must be within 1–65535; forest scope additionally
+requires port 3268 or 3269. Existing aliases, bounded retries and scope defaults remain.
+
+Test-IsValidUpn can be dot-sourced alone for local cross-platform validation:
+
+```powershell
+. ./Test-IsValidUpn.ps1
+Test-IsValidUpn 'first.last@example.com'
+```
+
+Keep its Private/Test-ITToolBoxDnsName.ps1 helper beside the script tree. The validator
+does not need AD, perform discovery, check configured suffixes or establish uniqueness.
+The Get-UniqueUPN command still performs a directory lookup: it does not claim an
+unchecked generated string is unique when AD is unavailable.

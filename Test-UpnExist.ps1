@@ -29,6 +29,10 @@ function Test-UPNExist
 
         [Alias('Server')]
         [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*(?::[0-9]{1,5})?$')]
+        [ValidateScript({
+            if ($_ -match ':([0-9]+)$') { [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le 65535 }
+            else { $true }
+        })]
         [string]$AdServer,
 
         [ValidateSet('Forest', 'Domain')]
