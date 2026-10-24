@@ -3,9 +3,9 @@ name: UPN functions
 on:
   push:
     branches: [master]
-    paths: ['Get-UniqueUPN.ps1', 'Test-UpnExist.ps1', 'Private/**', 'Tests/Upn.Tests.ps1', '.github/workflows/upn.yml']
+    paths: ['Get-UniqueUPN.ps1', 'Test-UpnExist.ps1', 'Test-IsValidUpn.ps1', 'Private/**', 'Tests/Upn.Tests.ps1', '.github/workflows/upn.yml']
   pull_request:
-    paths: ['Get-UniqueUPN.ps1', 'Test-UpnExist.ps1', 'Private/**', 'Tests/Upn.Tests.ps1', '.github/workflows/upn.yml']
+    paths: ['Get-UniqueUPN.ps1', 'Test-UpnExist.ps1', 'Test-IsValidUpn.ps1', 'Private/**', 'Tests/Upn.Tests.ps1', '.github/workflows/upn.yml']
   workflow_dispatch:
 
 permissions:

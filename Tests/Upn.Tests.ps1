@@ -146,3 +146,71 @@ Describe 'Directory query construction' {
         {Test-UPNExist -UPN 'john@example.com'} | Should -Throw '*requires Get-ADUser*'
     }
 }
+
+Describe 'UPN generation policy alignment' {
+    BeforeEach { Mock Test-UPNExist { $false } }
+    It 'rejects unsupported generated names before directory lookup: <First>' -ForEach @(
+        @{First='José';Last='García';Separator='.'}
+        @{First='.John';Last='Doe';Separator='.'}
+        @{First='John.';Last='Doe';Separator='.'}
+        @{First='John';Last='Doe';Separator='/'}
+        @{First='John';Last='Doe';Separator='..'}
+    ) {
+        { Get-UniqueUPN -FirstName $First -LastName $Last -Separator $Separator -UPNSuffix example.com } | Should -Throw '*supported syntax policy*'
+        Should -Invoke Test-UPNExist -Times 0 -Exactly
+    }
+    It 'preserves supported punctuation and IDN suffixes without transliteration' {
+        $candidate=Get-UniqueUPN -FirstName Anne-Marie -LastName "O'Brien" -UPNSuffix 'bücher.example'
+        $candidate | Should -BeExactly "anne-marie.o'brien@bücher.example"
+        Test-IsValidUpn $candidate | Should -BeTrue
+    }
+    It 'accepts explicitly normalized names and returns a policy-valid collision candidate' {
+        Mock Test-UPNExist { $UPN -ne 'jose.garcia2@example.com' }
+        $candidate=Get-UniqueUPN -FirstName Jose -LastName Garcia -UPNSuffix example.com
+        $candidate | Should -BeExactly 'jose.garcia2@example.com'
+        Test-IsValidUpn $candidate | Should -BeTrue
+    }
+    It 'does not require an optional ADUser middle-name property under StrictMode' {
+        $user=[pscustomobject]@{GivenName='Jane';Surname='Doe'}
+        $user.PSObject.TypeNames.Insert(0,'Microsoft.ActiveDirectory.Management.ADUser')
+        & {
+            Set-StrictMode -Version Latest
+            Get-UniqueUPN -ADObject $user -IncludeMiddleName -UPNSuffix example.com
+        } | Should -BeExactly 'jane.doe@example.com'
+    }
+}
+Describe 'UPN explicit server port validation' {
+    It 'rejects an invalid numeric port without a directory call: <Port>' -ForEach @(
+        @{Port='0'}; @{Port='65536'}; @{Port='99999'}
+    ) {
+        Mock Get-ADUser { throw 'Unexpected directory call' }
+        { Test-UPNExist -UPN 'john@example.com' -SearchScope Domain -AdServer "dc.example.com:$Port" } | Should -Throw
+        { Get-UniqueUPN -FirstName John -LastName Doe -UPNSuffix example.com -AdServer "dc.example.com:$Port" } | Should -Throw
+        Should -Invoke Get-ADUser -Times 0 -Exactly
+    }
+}
+
+Describe 'UPN syntax policy' {
+    It 'accepts supported usernames and suffixes: <Value>' -ForEach @(
+        @{ Value = 'alice@example.com' }; @{ Value = 'a@localhost' }
+        @{ Value = 'first.last@example.technology' }; @{ Value = 'first_last@sub-domain.example' }
+        @{ Value = "o'brien@example.com" }; @{ Value = 'alice@bücher.example' }
+    ) { Test-IsValidUpn $Value | Should -BeTrue }
+    It 'rejects unsupported UPN syntax: <Value>' -ForEach @(
+        @{ Value = $null }; @{ Value = '' }; @{ Value = ' ' }
+        @{ Value = 'alice' }; @{ Value = '@example.com' }; @{ Value = 'alice@' }
+        @{ Value = 'alice@@example.com' }; @{ Value = ' alice@example.com' }
+        @{ Value = 'alice@example.com ' }; @{ Value = 'a..b@example.com' }
+        @{ Value = '.alice@example.com' }; @{ Value = 'alice.@example.com' }
+        @{ Value = 'alice@bad_domain.example' }; @{ Value = 'alice@example..com' }
+        @{ Value = 'alice@-bad.example' }; @{ Value = 'alice@[127.0.0.1]' }
+        @{ Value = '"alice"@example.com' }; @{ Value = 'alice+tag@example.com' }
+    ) { Test-IsValidUpn $Value | Should -BeFalse }
+    It 'preserves aliases and returns independent pipeline results' {
+        Test-IsValidUpn -UPN 'alice@example.com' | Should -BeTrue
+        Test-IsValidUpn -ADUpn 'alice@example.com' | Should -BeTrue
+        Test-IsValidUpn -UniversalPrincipalName 'alice@example.com' | Should -BeTrue
+        $result = @('a@example.com', '', 'bad') | Test-IsValidUpn
+        ($result -join ',') | Should -Be 'True,False,False'
+    }
+}

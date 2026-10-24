@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 
 . (Join-Path $PSScriptRoot 'Test-UpnExist.ps1')
-. (Join-Path $PSScriptRoot 'Private/Test-ITToolBoxDnsName.ps1')
+. (Join-Path $PSScriptRoot 'Test-IsValidUpn.ps1')
 
 function Get-UniqueUPN
 {
@@ -13,6 +13,9 @@ function Get-UniqueUPN
         inputs. First and last name formatting are independent. Collisions append
         an integer to the complete local part; the search has a bounded attempt count.
         Availability is a preflight check, not a reservation or atomic uniqueness guarantee.
+        Generated candidates must satisfy Test-IsValidUpn's ASCII username and DNS/IDN
+        suffix policy. Normalize unsupported names explicitly; no transliteration is applied.
+        Requires ActiveDirectory lookup commands when invoked; script loading is portable.
     .PARAMETER MaxAttempts
         Maximum candidates to check, including the initial unsuffixed name. Defaults to 1000.
     .PARAMETER AdServer
@@ -50,6 +53,10 @@ function Get-UniqueUPN
 
         [Alias('Server')]
         [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*(?::[0-9]{1,5})?$')]
+        [ValidateScript({
+            if ($_ -match ':([0-9]+)$') { [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le 65535 }
+            else { $true }
+        })]
         [string]$ADServer,
 
         [ValidatePattern('^[^\s@\p{Cc}]*$')]
@@ -73,7 +80,8 @@ function Get-UniqueUPN
         {
             $givenName = [string]$ADObject.GivenName
             $surname = [string]$ADObject.Surname
-            $middleNameValue = [string]$ADObject.MiddleName
+            $middleProperty = $ADObject.PSObject.Properties['MiddleName']
+            $middleNameValue = if ($null -ne $middleProperty) { [string]$middleProperty.Value } else { '' }
         }
         elseif ($ADObject.PSObject.TypeNames -contains 'System.DirectoryServices.DirectoryEntry' -or
                 $ADObject.PSObject.TypeNames -contains 'System.DirectoryServices.SearchResult')
@@ -124,6 +132,11 @@ function Get-UniqueUPN
     $parts.Add($last)
     $localPart = ($parts -join $Separator).ToLowerInvariant()
     $suffix = $UPNSuffix.ToLowerInvariant()
+    $initialCandidate = '{0}@{1}' -f $localPart, $suffix
+    if (-not (Test-IsValidUpn -UserUpn $initialCandidate))
+    {
+        throw 'Generated UPN does not match the supported syntax policy (ASCII username and DNS/IDN suffix). Normalize the name or separator explicitly before calling.'
+    }
     $lookup = @{ SearchScope = $SearchScope; ErrorAction = 'Stop' }
     if ($PSBoundParameters.ContainsKey('ADServer'))
     {

@@ -34,7 +34,7 @@ The standalone OAuth-style request helper now follows the IT-ToolBox implementat
 
 ### UPN generation and directory lookup
 
-`Get-UniqueUPN` and `Test-UPNExist` now use explicit forest/domain lookup scope, escaped LDAP equality filters, bounded collision checks and independent name formatting. They require PowerShell 7.4; actual lookups additionally require the ActiveDirectory module and directory connectivity. See [usage and compatibility notes](./docs/UPN.md). These are availability checks, not atomic reservations.
+`Get-UniqueUPN` and `Test-UPNExist` now use explicit forest/domain lookup scope, escaped LDAP equality filters, bounded collision checks and independent name formatting. Generated names now follow the same ASCII username and DNS/IDN suffix policy as `Test-IsValidUpn`; unsupported names require explicit normalization. `Test-IsValidUpn` is also available standalone. They require PowerShell 7.4; actual lookups additionally require the ActiveDirectory module and directory connectivity. See [usage and compatibility notes](./docs/UPN.md). These are availability checks, not atomic reservations.
 
 ### Convert-EmlFile
 
